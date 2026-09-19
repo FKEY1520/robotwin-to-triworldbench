@@ -4,7 +4,7 @@
 
 这个项目把**旧版 RoboTwin ALOHA 机器人数据**转换成**采用 TriWorldBench 目录布局的自定义数据集**。它保留机器人的原始数值轨迹，导出三个相机视角的图像，选择一条原始任务指令，并使用 TriWorldBench 官方辅助脚本生成动作阶段标注。
 
-这是社区转换工具。转换后的数据仍然是你自己的数据集，不会因此变成官方验证集或测试集。脚本不负责下载数据集、训练模型、模型推理、评估，也不生成 VQA（视觉问答）的题目和答案。
+这是社区转换工具。转换后的数据仍然是你自己的数据集，不会因此变成官方验证集或测试集。
 
 第一次使用，按这条顺序操作即可：**安装环境 → 整理一个任务的数据 → 预检查 → 试转一条 → 用新目录全量转换**。下面提供可直接修改使用的完整命令。
 
@@ -121,6 +121,7 @@ your_workspace/
 
 可选元数据必须放在上图的配置目录下。存在时，脚本会复制 `scene_info.json`、`seed.txt`、`config.json`、`config.yaml`、`config.yml`；不会搜索任意其他目录中的元数据。
 
+<a name="first-conversion"></a>
 
 ## 4. 完成第一次转换
 
@@ -167,6 +168,7 @@ Windows PowerShell：
 
 转换先写入输出旁的临时目录，例如 `.adjust_bottle_clean50.partial-...`，全部成功后才改名成正式输出目录。正常捕获的转换错误会清理临时目录；强制结束进程或断电可能留下未完成的目录。
 
+<a name="output-layout"></a>
 
 ## 5. 看懂输出目录
 
@@ -234,7 +236,7 @@ outputs/adjust_bottle_clean50/
 
 官方标准读取器仍然读取 `.jpg`。如果自己的训练流程希望使用解码后像素完全一致的图片，需要显式读取 `lossless/` 中的 PNG；其中第 0 帧就是对应的无损首帧。不要仅把 PNG 后缀改成 `.jpg`。
 
-
+<a name="data-semantics"></a>
 
 ## 6. 动作数值、数据维度与图片质量
 
@@ -281,7 +283,7 @@ outputs/adjust_bottle_clean50/
 
 PNG 和完整源文件副本会增加磁盘占用和转换时间。如果不需要额外 PNG，可在转换命令末尾加 `--no-lossless-images`；标准 JPEG 与完整源 HDF5 仍会保留。JPEG 质量可通过 `--jpeg-quality` 设置为 `1` 到 `100`。
 
-
+<a name="instructions"></a>
 
 ## 7. 指令怎么选择，有哪些限制
 
@@ -327,18 +329,6 @@ PNG 和完整源文件副本会增加磁盘占用和转换时间。如果不需�
 | `--repair-paths BUNDLE_ROOT` | 未指定 | 对已有转换包修复路径元数据，而不执行新转换。 |
 | `-h`、`--help` | — | 显示帮助并退出。 |
 
-脚本当前两个路径默认值分别是：
-
-```text
---source-root
-P:\RoboTwin数据集\RoboTwin_Raw
-
---output-root
-P:\RoboTwin数据集\RoboTwin_convert\adjust_bottle_convert\TriWorldBench_adjust_bottle_smoke_v2
-```
-
-它们是本地开发默认值，不是别人电脑上必须使用的目录，也不是下载地址。在其他电脑上应显式覆盖这两个参数。含空格的路径需要加引号；`--task` 和 `--config` 各自只能是单个目录名。
-
 查看脚本自带帮助：
 
 ```powershell
@@ -363,11 +353,6 @@ Windows PowerShell：
 .\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --repair-paths '../moved_datasets/adjust_bottle_clean50'
 ```
 
-Linux / macOS：
-
-```bash
-./.venv/bin/python -X utf8 ./convert_robotwin_to_triworld.py --repair-paths '../moved_datasets/adjust_bottle_clean50'
-```
 
 这里的路径只是示例，应替换为实际移动后的位置。修复模式不使用 `--source-root`、`--task`、`--config` 和 `--output-root`。**不能与 `--dry-run` 同时使用**，这种组合会报错。
 
@@ -377,6 +362,7 @@ Linux / macOS：
 
 修复路径不会给旧包补上 PNG、源文件副本、场景元数据或新的指令选择。需要这些内容时，应从原始数据重新转换到一个新输出目录。
 
+<a name="troubleshooting"></a>
 
 ## 10. 常见问题与排查
 
@@ -399,7 +385,7 @@ Linux / macOS：
 
 成功完成的退出码为 `0`，捕获到的转换错误返回 `1`。命令行参数错误由 Python 参数解析器报告。应查看第一个错误，而不能因为前面出现过 `[ok]` 就认为整批已经成功。
 
-
+<a name="verification"></a>
 
 ## 11. 测试方法与已验证范围
 
@@ -407,12 +393,6 @@ Linux / macOS：
 
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
-```
-
-Linux/macOS 等价命令仅供参考。当前测试包含 Windows 特有的路径用例，尚未在这两个系统上验证，不能假定会得到相同通过结果：
-
-```bash
-./.venv/bin/python -X utf8 -m unittest discover -s tests -v
 ```
 
 现有 **34 项测试**检查指令选择、路径安全、路径修复、备份和失败回滚。已在 Windows 本地运行并全部通过。测试使用合成样例，不代表已经逐包验证全部官方数据，也不是完整图像转换的真实数据测试。
@@ -427,7 +407,7 @@ Linux/macOS 等价命令仅供参考。当前测试包含 Windows 特有的路�
 
 对于自己的数据，应确认终端输出 `SUCCESS`，查看 `conversion_report.json`，检查指令警告和代表性图片，并让自己的训练或评估读取器实际读取转换包。目录名称及上述验证记录都不能保证其他任务、机器人或后续发布版本一定兼容。
 
-
+<a name="references"></a>
 
 ## 12. 官方资料与辅助脚本
 
