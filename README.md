@@ -62,23 +62,36 @@ You need Git, **Python 3.10 or newer**, and enough space for the original HDF5 f
 
 The required Python packages are `numpy`, `h5py`, `Pillow`, and `opencv-python`. There is currently no `requirements.txt`; install them using the command below.
 
-The commands run Python directly from a virtual environment, an isolated directory for this project's dependencies. You do not need to activate it or change PowerShell's execution policy.
+This project uses its own virtual environment, `.venv_converter`, to keep its dependencies separate. If you already have a `.venv` directory, leave it in place; you do not need to overwrite it. The commands below run Python directly from `.venv_converter`, so you do not need to activate it or change PowerShell's execution policy.
 
-### Windows: PowerShell
+### Windows: PowerShell or Command Prompt (CMD)
 
-Run this in a parent directory where you want to keep the project:
+**First installation only:** use this section to prepare the project. **For later runs**, go straight to the conversion commands in Section 4 and use `.\.venv_converter\Scripts\python.exe`; do not recreate the environment each time.
+
+If `.venv_converter` already exists, check `.\.venv_converter\Scripts\python.exe --version`. **Do not create an environment over an existing `.venv_converter` using a different Python version.** That can leave incompatible binary packages behind. The conditional creation command below skips an existing directory. To intentionally switch versions, move the old environment outside the repository as a backup, create a fresh, empty `.venv_converter` with the chosen Python, and reinstall all four dependencies. Do not copy the old `site-packages` into the new environment.
+
+The following first-installation block uses PowerShell. Run it in a parent directory where you want to keep the project:
 
 ```powershell
 git -c core.autocrlf=false clone https://github.com/FKEY1520/robotwin-to-triworldbench.git robotwin-to-triworldbench
 Set-Location .\robotwin-to-triworldbench
 git config core.autocrlf false
 py -3 --version
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install numpy h5py Pillow opencv-python
+if (-not (Test-Path ".venv_converter")) { py -3 -m venv .venv_converter }
+.\.venv_converter\Scripts\python.exe -m pip install --upgrade pip
+.\.venv_converter\Scripts\python.exe -m pip install numpy h5py Pillow opencv-python
+.\.venv_converter\Scripts\python.exe -c "import sys, numpy, h5py, PIL, cv2; print(sys.version); print('Dependencies OK')"
 ```
 
-Check that `py -3 --version` reports Python 3.10 or newer before creating the environment. If `py` is unavailable, check `python --version`, then use `python -m venv .venv` to create the environment.
+Check that `py -3 --version` reports Python 3.10 or newer before creating the environment. If `py` is unavailable, check `python --version`, then replace `py -3` with `python` inside the conditional creation command; keep the directory check.
+
+In CMD, replace `Set-Location` with `cd /d ".\robotwin-to-triworldbench"`, and replace the entire PowerShell `if` line with:
+
+```bat
+if not exist ".venv_converter" py -3 -m venv .venv_converter
+```
+
+The PowerShell and CMD conditional commands are different; do not paste one into the other terminal. The direct Python commands for installation, checking imports, and conversion work in either terminal. Path arguments use **double quotes** because CMD treats single quotes as part of the path rather than as quotation marks.
 
 ### Linux / macOS: shell
 
@@ -89,9 +102,9 @@ git -c core.autocrlf=false clone https://github.com/FKEY1520/robotwin-to-triworl
 cd robotwin-to-triworldbench
 git config core.autocrlf false
 python3 --version
-python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip
-./.venv/bin/python -m pip install numpy h5py Pillow opencv-python
+if [ ! -e .venv_converter ]; then python3 -m venv .venv_converter; fi
+./.venv_converter/bin/python -m pip install --upgrade pip
+./.venv_converter/bin/python -m pip install numpy h5py Pillow opencv-python
 ```
 
 Check that `python3 --version` reports Python 3.10 or newer. Some Linux installations require their distribution's Python `venv` package first.
@@ -108,6 +121,7 @@ your_workspace/
 │   ├── convert_robotwin_to_triworld.py
 │   ├── README.md
 │   ├── README_CN.md
+│   ├── .venv_converter/                # Dedicated Python environment; created during installation
 │   ├── tests/
 │   └── _triworld_helpers/
 └── RoboTwin_Raw/                       # Source data, outside the repository
@@ -160,16 +174,16 @@ Run all commands from the repository directory. Relative paths below are resolve
 
 ### Step 1: Check all selected episodes without generating output
 
-Windows PowerShell:
+Windows PowerShell / CMD:
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_smoke' --limit 0 --dry-run
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 0 --dry-run
 ```
 
 Linux / macOS:
 
 ```bash
-./.venv/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_smoke' --limit 0 --dry-run
+./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 0 --dry-run
 ```
 
 The dry run checks file paths, matching instructions, required fields, array shapes, finite numeric values, vector order, and arm/instruction consistency for every selected episode. It reads the numeric arrays, so it may take time on a large dataset.
@@ -178,16 +192,16 @@ It **does not decode images, check their decoded resolution, load/download helpe
 
 ### Step 2: Fully convert one episode
 
-Windows PowerShell:
+Windows PowerShell / CMD:
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_smoke' --limit 1
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 1
 ```
 
 Linux / macOS:
 
 ```bash
-./.venv/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_smoke' --limit 1
+./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 1
 ```
 
 This small trial is often called a **smoke run**. It performs the actual image decoding and export, numeric copy verification, source preservation, and STATE generation. If the official helpers are missing, the script downloads the exact pinned versions and verifies their hashes.
@@ -198,16 +212,16 @@ A completed run prints `SUCCESS:` followed by the output location. Open the thre
 
 Use a **new output directory** so that it does not conflict with the smoke run:
 
-Windows PowerShell:
+Windows PowerShell / CMD:
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_clean50' --limit 0
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_clean50" --limit 0
 ```
 
 Linux / macOS:
 
 ```bash
-./.venv/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_clean50' --limit 0
+./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_clean50" --limit 0
 ```
 
 `--limit 0` means all matching files currently present, including the episode already used for the smoke run. This creates a separate complete bundle. A folder named `clean_50` is not by itself proof that 50 files are available. For another task, change `--task`, `--config` as needed, and `--output-root`; run the same three-step workflow again.
@@ -380,11 +394,11 @@ These are local development defaults, not required folder names or shared downlo
 To display the script's built-in help:
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --help
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --help
 ```
 
 ```bash
-./.venv/bin/python -X utf8 ./convert_robotwin_to_triworld.py --help
+./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --help
 ```
 
 ## 9. Move a converted dataset
@@ -393,16 +407,16 @@ Move or copy the **whole bundle**, including `source_data/`, before repairing pa
 
 From the repository directory, pass the bundle's **new** root:
 
-Windows PowerShell:
+Windows PowerShell / CMD:
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --repair-paths '../moved_datasets/adjust_bottle_clean50'
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --repair-paths "../moved_datasets/adjust_bottle_clean50"
 ```
 
 Linux / macOS:
 
 ```bash
-./.venv/bin/python -X utf8 ./convert_robotwin_to_triworld.py --repair-paths '../moved_datasets/adjust_bottle_clean50'
+./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --repair-paths "../moved_datasets/adjust_bottle_clean50"
 ```
 
 Replace the example path with the directory you actually moved the bundle to. Repair mode does not use `--source-root`, `--task`, `--config`, or `--output-root`. **Do not combine it with `--dry-run`; that combination is rejected.**
@@ -415,7 +429,9 @@ Older bundles without preserved source copies can also have their paths repaired
 
 | Message or symptom | Cause and next step |
 | --- | --- |
-| `Missing dependency` / `No module named ...` | Install the four packages using the same virtual-environment Python used to run conversion. Check that the terminal is in the repository directory. |
+| `Dependency import failed` / `Missing dependency` / `No module named ...` | Check the Python executable and version printed by the script. Install or repair the four packages using that same interpreter; the script prints a matching command. Check that the terminal is in the repository directory. |
+| `cannot import name '_errors' from partially initialized module 'h5py'` | This can indicate a Python/package binary mismatch, rather than a circular import. `cp312` and `cp313` extensions target CPython 3.12 and 3.13 respectively and are not interchangeable. Check `.\.venv_converter\Scripts\python.exe --version`, then use the repair commands below to reinstall dependencies for that interpreter. |
+| A path printed in an error contains literal single quotes | CMD does not remove single quotes around arguments. Use double quotes around paths, as in this README. |
 | `Expected source folder` / `No episodeN.hdf5 files found` | Check `SOURCE_ROOT/TASK/CONFIG/data/`, archive extraction nesting, and exact file names. The script does not read ZIP files directly. |
 | `Missing matching instruction` | Supply the actual `instructions/episodeN.json` paired with that recording. HDF5 files alone are insufficient. |
 | `Output already exists` | Choose a new `--output-root`. Rerunning in an existing bundle does not resume or overwrite it; this check also applies to dry runs. |
@@ -432,18 +448,30 @@ Older bundles without preserved source copies can also have their paths repaired
 
 Successful completion returns exit code `0`; a caught conversion failure returns `1`. Argument errors are reported by Python's argument parser. Inspect the first error rather than assuming earlier `[ok]` messages mean the entire batch finished.
 
+### Repair dependencies after changing Python versions on Windows
+
+From the repository directory, run the following commands in either PowerShell or CMD. **Do not run `py -3 -m venv .venv_converter` again before or after this repair.** The commands use the Python currently inside `.venv_converter` and reinstall matching binary packages:
+
+```powershell
+.\.venv_converter\Scripts\python.exe --version
+.\.venv_converter\Scripts\python.exe -m pip install --force-reinstall --only-binary=:all: numpy h5py Pillow opencv-python
+.\.venv_converter\Scripts\python.exe -c "import sys, numpy, h5py, PIL, cv2; print(sys.version); print('Dependencies OK')"
+```
+
+`Requirement already satisfied` only means pip found an installed package satisfying the requested version; it does not verify that its compiled extensions can load in the current Python. `--force-reinstall` replaces those packages, and the import command actually checks all four libraries (`Pillow` imports as `PIL`, and `opencv-python` as `cv2`). Continue converting only after `Dependencies OK` appears. If imports still fail, move the old environment aside and create a fresh environment as described in Section 2.
+
 ## 11. Tests and verification scope
 
 Run the included regression tests from the repository root. Windows is the verified environment:
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
+.\.venv_converter\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
 ```
 
 The equivalent Linux/macOS command is shown for reference. The current suite includes Windows-specific path tests and has not been verified on those systems, so do not assume the same pass result there:
 
 ```bash
-./.venv/bin/python -X utf8 -m unittest discover -s tests -v
+./.venv_converter/bin/python -X utf8 -m unittest discover -s tests -v
 ```
 
 The current suite contains **34 tests**, covering instruction selection, path safety, and repair/backup/rollback behavior. The previously recorded local run passed all 34. These tests do not establish that every official dataset archive is compatible.

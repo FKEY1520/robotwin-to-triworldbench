@@ -66,26 +66,36 @@
 
 Python 依赖只有这四项：`numpy`、`h5py`、`Pillow`、`opencv-python`。当前仓库没有 `requirements.txt`，直接使用下面的安装命令。
 
-虚拟环境 `.venv` 用来单独存放本项目的依赖。下面始终直接调用虚拟环境中的 Python，**不需要激活环境，也不需要修改 PowerShell 执行策略**。
+本项目使用专用虚拟环境 `.venv_converter` 单独存放依赖。如果已经有 `.venv` 目录，保留它即可，不需要覆盖它。下面始终直接调用 `.venv_converter` 中的 Python，**不需要激活环境，也不需要修改 PowerShell 执行策略**。
 
-### Windows：使用 PowerShell
+### Windows：使用 PowerShell 或命令提示符（CMD）
 
-在准备存放项目的上级目录打开 PowerShell，执行：
+**首次安装**才使用本节准备环境。**以后再次运行**，直接进入项目目录，执行第 4 节中以 `.\.venv_converter\Scripts\python.exe` 开头的转换命令，不要每次重新创建虚拟环境。
+
+如果已经存在 `.venv_converter`，先执行 `.\.venv_converter\Scripts\python.exe --version` 查看它的 Python 版本。**不要用另一个 Python 版本直接覆盖创建现有 `.venv_converter`**，否则可能留下不兼容的二进制依赖。下面的条件命令会跳过已有目录。确实需要切换版本时，先把旧环境移到仓库外备份，再用选定的 Python 创建全新的空白 `.venv_converter`，重新安装四个依赖。不要把旧环境的 `site-packages` 复制到新环境。
+
+首次安装时，在准备存放项目的上级目录打开 PowerShell，执行：
 
 ```powershell
 git -c core.autocrlf=false clone https://github.com/FKEY1520/robotwin-to-triworldbench.git robotwin-to-triworldbench
 Set-Location .\robotwin-to-triworldbench
 git config core.autocrlf false
 py -3 --version
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install numpy h5py Pillow opencv-python
+if (-not (Test-Path ".venv_converter")) { py -3 -m venv .venv_converter }
+.\.venv_converter\Scripts\python.exe -m pip install --upgrade pip
+.\.venv_converter\Scripts\python.exe -m pip install numpy h5py Pillow opencv-python
+.\.venv_converter\Scripts\python.exe -c "import sys, numpy, h5py, PIL, cv2; print(sys.version); print('Dependencies OK')"
 ```
 
-先确认 `py -3 --version` 显示的版本不低于 3.10，再创建虚拟环境。如果系统没有 `py` 命令，可以先用 `python --version` 确认版本，然后把创建环境的命令换成 `python -m venv .venv`。
+先确认 `py -3 --version` 显示的版本不低于 3.10，再创建虚拟环境。如果系统没有 `py` 命令，可以先用 `python --version` 确认版本，再把条件创建命令中的 `py -3` 换成 `python`，保留检查目录是否存在的条件。
 
+如果使用 CMD，把 `Set-Location` 一行换成 `cd /d ".\robotwin-to-triworldbench"`，再把整行 PowerShell `if` 命令换成：
 
-**为什么克隆时关闭自动换行转换？**仓库中的两个官方辅助脚本会经过 SHA-256 校验，也就是检查文件字节是否与固定版本完全相同。Git 如果把 LF 换行自动改成 Windows CRLF，即使代码看起来没变，校验也会失败。请保持辅助脚本原始字节不变；遇到校验问题时见[第 12 节](#references)。
+```bat
+if not exist ".venv_converter" py -3 -m venv .venv_converter
+```
+
+PowerShell 与 CMD 的条件命令不同，不能直接混用。安装依赖、检查导入和转换数据的直接 Python 命令则可以在两种终端中使用。示例路径统一使用**双引号**：CMD 会把单引号当作路径的一部分，不会把它识别为包围路径的引号。
 
 <a name="source-data"></a>
 
@@ -99,6 +109,7 @@ your_workspace/
 │   ├── convert_robotwin_to_triworld.py
 │   ├── README.md
 │   ├── README_CN.md
+│   ├── .venv_converter/                # 安装时创建的本项目专用 Python 环境
 │   ├── tests/
 │   └── _triworld_helpers/
 └── RoboTwin_Raw/                       # --source-root 指向这里
@@ -130,10 +141,10 @@ your_workspace/
 
 ### 第一步：预检查全部轨迹
 
-Windows PowerShell：
+Windows PowerShell / CMD：
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_smoke' --limit 0 --dry-run
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 0 --dry-run
 ```
 
 `--dry-run` 会检查路径、配套指令、所需字段、数组形状、数值是否有限、动作向量拼接顺序，以及能够识别的机械臂和指令冲突。它会读取数值数组，数据量大时也需要等待。
@@ -142,10 +153,10 @@ Windows PowerShell：
 
 ### 第二步：实际试转一条轨迹
 
-Windows PowerShell：
+Windows PowerShell / CMD：
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_smoke' --limit 1
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 1
 ```
 
 这类小规模试运行通常叫 **smoke run**。它会实际解码并导出图像、复制和校验数值、保留源文件、生成阶段标注。如果官方辅助脚本缺失，会先下载固定版本并校验。
@@ -156,10 +167,10 @@ Windows PowerShell：
 
 这里使用另一个输出目录，不能继续写入已经存在的试转目录。全量转换会重新包含已经试转过的那条轨迹，不是只转换“剩余轨迹”。
 
-Windows PowerShell：
+Windows PowerShell / CMD：
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root '../RoboTwin_Raw' --task adjust_bottle --config aloha-agilex_clean_50 --output-root './outputs/adjust_bottle_clean50' --limit 0
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_clean50" --limit 0
 ```
 
 `--limit 0` 表示当前所选任务和配置中实际存在的全部匹配文件。文件夹名称含 `clean_50` 不代表里面一定有 50 个文件。换一个任务时，修改 `--task`、必要时修改 `--config`，再指定新的 `--output-root`，重复上面的步骤。
@@ -332,11 +343,11 @@ PNG 和完整源文件副本会增加磁盘占用和转换时间。如果不需�
 查看脚本自带帮助：
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --help
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --help
 ```
 
 ```bash
-./.venv/bin/python -X utf8 ./convert_robotwin_to_triworld.py --help
+./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --help
 ```
 
 <a name="move-bundle"></a>
@@ -347,10 +358,10 @@ PNG 和完整源文件副本会增加磁盘占用和转换时间。如果不需�
 
 移动完成后，在项目目录中运行下面的命令，参数填写转换包的**新位置**：
 
-Windows PowerShell：
+Windows PowerShell / CMD：
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --repair-paths '../moved_datasets/adjust_bottle_clean50'
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --repair-paths "../moved_datasets/adjust_bottle_clean50"
 ```
 
 
@@ -368,7 +379,9 @@ Windows PowerShell：
 
 | 报错或现象 | 原因与处理方式 |
 | --- | --- |
-| `Missing dependency` / `No module named ...` | 使用运行脚本的同一个虚拟环境 Python 安装四个依赖，确认终端位于项目目录。 |
+| `Dependency import failed` / `Missing dependency` / `No module named ...` | 查看脚本显示的 Python 路径和版本，使用该解释器安装或修复四个依赖；脚本会打印匹配的修复命令。确认终端位于项目目录。 |
+| `cannot import name '_errors' from partially initialized module 'h5py'` | 可能是 Python 与依赖的二进制版本不匹配，不一定是真的循环导入。`cp312` 与 `cp313` 扩展分别对应 CPython 3.12 与 3.13，不能互用。先执行 `.\.venv_converter\Scripts\python.exe --version`，再使用下面的修复命令，为这个解释器重新安装依赖。 |
+| 报错显示的路径中带有单引号 | CMD 不会去掉参数两侧的单引号。请像本文示例一样使用双引号包围路径。 |
 | `Expected source folder` / `No episodeN.hdf5 files found` | 检查 `SOURCE_ROOT/TASK/CONFIG/data/`、压缩包是否多套了一层目录，以及文件名。脚本不能直接读取 ZIP。 |
 | `Missing matching instruction` | 缺少与轨迹配套的 `instructions/episodeN.json`。仅有 HDF5 不够，应找回真正对应的原始指令。 |
 | `Output already exists` | 更换一个不存在的 `--output-root`。已有目录不能续传或覆盖；预检查也有这个限制。 |
@@ -385,6 +398,18 @@ Windows PowerShell：
 
 成功完成的退出码为 `0`，捕获到的转换错误返回 `1`。命令行参数错误由 Python 参数解析器报告。应查看第一个错误，而不能因为前面出现过 `[ok]` 就认为整批已经成功。
 
+### Windows：修复切换 Python 版本后不匹配的依赖
+
+在项目目录中执行以下命令，PowerShell 和 CMD 均可使用。**修复前后都不要再执行 `py -3 -m venv .venv_converter`。**下面始终使用 `.venv_converter` 当前的 Python，重新安装与其匹配的二进制包：
+
+```powershell
+.\.venv_converter\Scripts\python.exe --version
+.\.venv_converter\Scripts\python.exe -m pip install --force-reinstall --only-binary=:all: numpy h5py Pillow opencv-python
+.\.venv_converter\Scripts\python.exe -c "import sys, numpy, h5py, PIL, cv2; print(sys.version); print('Dependencies OK')"
+```
+
+`Requirement already satisfied` 只表示 pip 找到了满足版本要求的已安装包，**不代表其中的二进制扩展能被当前 Python 加载**。`--force-reinstall` 会重新安装这些包，后面的导入命令会实际检查四个库（`Pillow` 用 `PIL` 导入，`opencv-python` 用 `cv2` 导入）。看到 `Dependencies OK` 后再继续转换。如果仍无法导入，应按第 2 节把旧环境移走备份，创建全新的环境。
+
 <a name="verification"></a>
 
 ## 11. 测试方法与已验证范围
@@ -392,7 +417,7 @@ Windows PowerShell：
 在项目根目录运行回归测试。Windows 是已经验证的环境：
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
+.\.venv_converter\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
 ```
 
 现有 **34 项测试**检查指令选择、路径安全、路径修复、备份和失败回滚。已在 Windows 本地运行并全部通过。测试使用合成样例，不代表已经逐包验证全部官方数据，也不是完整图像转换的真实数据测试。

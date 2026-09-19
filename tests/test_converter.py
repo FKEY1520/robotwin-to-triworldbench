@@ -1,7 +1,7 @@
 """Regression tests for instruction consistency and movable bundle paths.
 
 Run from the converter directory with:
-    .venv/Scripts/python.exe -m unittest discover -s tests -v
+    .venv_converter/Scripts/python.exe -m unittest discover -s tests -v
 
 Fixtures are deliberately synthetic: tests do not read or modify RoboTwin data.
 """

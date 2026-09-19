@@ -27,6 +27,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import shlex
 import shutil
 import sys
 import tempfile
@@ -39,9 +40,23 @@ try:
     import numpy as np
     from PIL import Image
 except ImportError as exc:
+    repair_args = "-m pip install --force-reinstall --only-binary=:all: numpy h5py Pillow opencv-python"
+    if sys.platform == "win32":
+        powershell_python = sys.executable.replace("'", "''")
+        repair_commands = (
+            f"PowerShell: & '{powershell_python}' {repair_args}\n"
+            f'CMD: "{sys.executable}" {repair_args}'
+        )
+    else:
+        repair_commands = f"{shlex.quote(sys.executable)} {repair_args}"
     raise SystemExit(
-        f"Missing dependency: {exc}\n"
-        "Run: python -m pip install numpy h5py Pillow opencv-python"
+        f"Dependency import failed: {exc}\n"
+        f"Python {sys.version.split()[0]}: {sys.executable}\n"
+        "A package may be missing, damaged, or built for a different Python version.\n"
+        "Recreating an existing virtual environment with another Python version can leave incompatible packages.\n"
+        "'Requirement already satisfied' does not verify that binary extensions can be imported.\n"
+        "Reinstall the dependencies using this environment's Python, then rerun conversion:\n"
+        f"{repair_commands}"
     )
 
 HELPERS = {
