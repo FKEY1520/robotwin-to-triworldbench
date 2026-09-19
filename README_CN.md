@@ -2,9 +2,7 @@
 
 # RoboTwin → TriWorldBench 数据格式转换工具
 
-这个项目把**旧版 RoboTwin ALOHA 机器人数据**转换成**采用 TriWorldBench 目录布局的自定义数据集**。它保留机器人的原始数值轨迹，导出三个相机视角的图像，选择一条原始任务指令，并使用 TriWorldBench 官方辅助脚本生成动作阶段标注。
-
-这是社区转换工具。转换后的数据仍然是你自己的数据集，不会因此变成官方验证集或测试集。
+这个项目把**旧版 RoboTwin ALOHA 机器人数据**转换成**采用 TriWorldBench 目录布局的自定义数据集**。它保留机器人的原始数值轨迹，导出三个相机视角的图像，选择一条原始任务指令，并使用 TriWorldBench 官方辅助脚本生成动作阶段标注。这是转换工具。转换后的数据仍然是你自己的数据集，不会因此变成官方验证集或测试集。
 
 第一次使用，按这条顺序操作即可：**安装环境 → 整理一个任务的数据 → 预检查 → 试转一条 → 用新目录全量转换**。下面提供可直接修改使用的完整命令。
 
@@ -136,34 +134,8 @@ your_workspace/
 
 ## 4. 完成第一次转换
 
-**换一个任务，通常仍运行同一个转换脚本，修改的是输入与输出参数。**前提是新的数据仍满足第 1 节的格式要求。下面先说明怎么填写路径，再按“预检查 → 试转一条 → 全量转换”的顺序执行。
 
-### 4.1 先确定四个路径参数
-
-脚本通过下面的规则找到源文件：
-
-```text
-所选源目录 = --source-root / --task / --config
-轨迹文件   = 所选源目录 / data / episodeN.hdf5
-指令文件   = 所选源目录 / instructions / episodeN.json
-```
-
-以第 3 节中项目与 `RoboTwin_Raw` 并列的目录结构为例：
-
-| 参数 | 示例值 | 应填写什么 |
-| --- | --- | --- |
-| `--source-root` | `"../RoboTwin_Raw"` | 包含各个任务目录的原始数据总目录。 |
-| `--task` | `adjust_bottle` | 实际的任务子目录名，也用于任务元信息和阶段分类。 |
-| `--config` | `aloha-agilex_clean_50` | 任务里面实际的数据配置子目录名，不是 YAML 文件路径。 |
-| `--output-root` | `"./outputs/adjust_bottle_smoke"` | 本次转换包的保存位置，必须是尚不存在的新目录。 |
-
-**不要把 `--source-root` 指向任务、配置或 `data` 那一层。**脚本还会自动追加 `--task` 和 `--config`，填得太深会造成重复拼接。`--task` 与 `--config` 各自只能是一个真实的目录名；改参数不会自动下载数据、生成另一种配置，或把一种任务变成另一种任务。
-
-相对路径从**终端当前所在目录**计算：`./` 表示当前目录，`../` 表示上一级目录。也可以使用绝对路径，例如本机的 `--source-root "P:\RoboTwin数据集\RoboTwin_Raw"`。若数据在其他磁盘，就填写自己的实际位置，不需要照搬示例中的盘符。
-
-每个 `data/episodeN.hdf5` 都应有同编号的 `instructions/episodeN.json`。源编号不必从 0 开始，也不必连续，但文件名必须符合 `episode` 加数字的规则。压缩包应先解压，不能直接把 ZIP 路径传给脚本。
-
-### 4.2 进入项目，确认脚本和数据位置
+### 4.1 进入项目，确认脚本和数据位置
 
 以下使用本机项目路径举例；项目放在其他位置时，替换第一行的目录。**已经安装好环境就直接使用 `.venv_converter`，这里不需要重新创建虚拟环境。**
 
@@ -180,19 +152,8 @@ Test-Path "../RoboTwin_Raw/adjust_bottle/aloha-agilex_clean_50/instructions"
 
 四次 `Test-Path` 都应返回 `True`。`--help` 应列出 `--source-root`、`--task`、`--config`、`--output-root`、`--limit`、`--dry-run` 等参数；全部参数见第 8 节。`Test-Path` 只确认路径存在，数据内容是否符合要求要由后面的预检查判断。换任务时，这里的检查路径也要同步修改。
 
-如果使用 CMD，进入目录的命令是 `cd /d "P:\RoboTwin数据集\convert_robotwin_to_triworld"`。`Set-Location` 和 `Test-Path` 属于 PowerShell，不能直接粘贴到 CMD；下面的 Python 转换命令使用双引号，可以在这两种终端中运行。
 
-阅读后面的命令时，可以把它拆成三部分：
-
-| 命令部分 | 含义 |
-| --- | --- |
-| `.\.venv_converter\Scripts\python.exe` | 使用本项目专用环境的 Python。 |
-| `-X utf8 .\convert_robotwin_to_triworld.py` | 启用 UTF-8 模式，并运行当前目录中的转换脚本。 |
-| `--task adjust_bottle` 等参数 | `--task` 是固定参数名，`adjust_bottle` 是按实际数据填写的值，两者用空格分开。 |
-
-后面的每条转换命令都写成完整的一行。复制时只复制代码内容，不复制 Markdown 的代码围栏；保留路径两侧的双引号，尤其是路径中有空格时。编辑器显示时自动折行不影响命令，不需要手动加入换行或续行符。
-
-### 4.3 第一步：预检查全部轨迹
+### 4.2 第一步：预检查全部轨迹
 
 Windows PowerShell / CMD：
 
@@ -212,9 +173,7 @@ Windows PowerShell / CMD：
 Dry run passed. Image decoding and output creation have not run yet.
 ```
 
-即使是预检查，指定的输出目录也必须尚不存在，空目录也不行。不要提前创建 `adjust_bottle_smoke`；脚本会在实际转换时创建它。输出目录不能等于所选 `task/config` 源目录，也不能是它的父目录或子目录。这里把结果放在项目的 `outputs/` 中，与原始数据分开。
-
-### 4.4 第二步：实际试转一条轨迹
+### 4.3 第二步：实际试转一条轨迹
 
 移除 `--dry-run`，并将 `--limit` 设为 `1`。预检查没有创建输出，因此下面可以继续使用同一个 smoke 输出路径；如果以前已经实际转换成功，则需要换一个新目录名。
 
@@ -228,7 +187,7 @@ Windows PowerShell / CMD：
 
 完成后终端会打印 `SUCCESS:` 和输出位置。继续全量转换前，可以打开 `outputs/adjust_bottle_smoke/test_dataset/first_frame/` 中的三张首帧图片，并查看 `conversion_report.json` 和 `robotwin_episode_mapping.json`。按上面命令试转一条后，报告应包含 `"episode_count": 1`、`"numeric_values_and_dtype_preserved": true`、`"lossless_pngs": true`。还要检查 `instruction_warnings`，成功转换也可能带有标注警告。
 
-### 4.5 第三步：用新目录转换全部轨迹
+### 4.4 第三步：用新目录转换全部轨迹
 
 这里使用另一个输出目录，不能继续写入已经存在的试转目录。全量转换会重新包含已经试转过的那条轨迹，不是只转换“剩余轨迹”。
 
@@ -246,7 +205,7 @@ Windows PowerShell / CMD：
 
 转换先写入输出旁的临时目录，例如 `.adjust_bottle_clean50.partial-...`，全部成功后才改名成正式输出目录。正常捕获的转换错误会清理临时目录；强制结束进程或断电可能留下未完成的目录。
 
-### 4.6 换任务、换配置或换磁盘时，具体改哪里
+### 4.5 换任务、换配置或换磁盘时，具体改哪里
 
 | 你要做的事 | `--source-root` | `--task` | `--config` | `--output-root` 与运行模式 |
 | --- | --- | --- | --- | --- |
