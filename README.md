@@ -1,27 +1,29 @@
-[English](README.md) | [简体中文](README_CN.md)
+English | [简体中文](README_CN.md)
 
-# RoboTwin → TriWorldBench Converter
+# RoboTwin → TriWorldBench Data Format Converter
 
 Convert **legacy RoboTwin ALOHA HDF5 episodes** into a **custom dataset bundle with the TriWorldBench directory layout**. The converter copies robot trajectories without changing their numerical values, exports three camera views, selects an original task instruction, and generates phase annotations using an official TriWorldBench helper.
 
-This is a community converter. Its output is your own converted dataset; it does not become the official TriWorldBench validation/test split. The script does not download datasets, train a model, run inference, run evaluation, or generate VQA questions and answers.
+This is a community converter. Its output remains your own dataset; conversion does not make it part of the official validation or test split.
 
-For a first run: **install dependencies → prepare one task → run a dry run → convert one episode → convert the entire task/configuration**. The examples below provide every command.
+For your first run, follow this sequence: **install the environment → prepare one task's data → run a preflight check → convert one episode → convert all episodes into a new directory**. The commands below are complete examples that you can adapt to your paths.
 
 ## Contents
 
-- [1. Basic terms and supported data](#1-basic-terms-and-supported-data)
-- [2. Install the project](#2-install-the-project)
-- [3. Prepare the source dataset](#3-prepare-the-source-dataset)
-- [4. Convert your first dataset](#4-convert-your-first-dataset)
-- [5. Understand the output](#5-understand-the-output)
-- [6. Numerical values, actions, and image quality](#6-numerical-values-actions-and-image-quality)
-- [7. Instruction selection and its limits](#7-instruction-selection-and-its-limits)
-- [8. All command-line options](#8-all-command-line-options)
-- [9. Move a converted dataset](#9-move-a-converted-dataset)
-- [10. Troubleshooting](#10-troubleshooting)
-- [11. Tests and verification scope](#11-tests-and-verification-scope)
-- [12. Official references and helper files](#12-official-references-and-helper-files)
+- [1. Basic terms and supported data](#basics)
+- [2. Install the project](#installation)
+- [3. Prepare the source dataset](#source-data)
+- [4. Convert your first dataset](#first-conversion)
+- [5. Understand the output](#output-layout)
+- [6. Numerical values, actions, and image quality](#data-semantics)
+- [7. Instruction selection and its limits](#instructions)
+- [8. All command-line options](#cli-options)
+- [9. Move a converted dataset](#move-bundle)
+- [10. Troubleshooting](#troubleshooting)
+- [11. Tests and verification scope](#verification)
+- [12. Official references and helper files](#references)
+
+<a name="basics"></a>
 
 ## 1. Basic terms and supported data
 
@@ -38,9 +40,9 @@ For a first run: **install dependencies → prepare one task → run a dry run �
 
 ### Supported input
 
-The converter currently targets **legacy ALOHA data with 14-dimensional joint actions**. Each episode must have:
+The converter currently targets **legacy dual-arm ALOHA data with 14-dimensional joint actions**. Each episode must have:
 
-- The nine numeric datasets listed in [Section 6](#6-numerical-values-actions-and-image-quality).
+- The nine numeric datasets listed in [Section 6](#data-semantics).
 - Three camera datasets: `observation/head_camera/rgb`, `observation/left_camera/rgb`, and `observation/right_camera/rgb`.
 - Images that decode to **320 × 240 RGB** pixels, stored as `uint8` arrays of shape `(240, 320, 3)` after decoding.
 - The same nonzero number of time steps across the three cameras and all numeric datasets.
@@ -52,9 +54,11 @@ The script checks that numeric values are finite and that `joint_action/vector` 
 
 ### How many episodes can it convert?
 
-There is no fixed episode-count limit in the script. One invocation processes **one task and one configuration**. `--limit 1` converts one episode; `--limit 0` selects all matching episodes in that task/configuration directory. It does not traverse every task on the official website.
+There is no fixed episode-count limit in the script. One invocation processes **one task and one configuration**. `--limit 1` selects one episode; `--limit 0` selects all matching episodes in that task/configuration directory. It does not traverse every task on the official website.
 
 The number that successfully converts depends on the files actually present, their format, annotation consistency, and available disk space. No success count is claimed for the entire official RoboTwin collection. Start with the checks below for each new task/configuration.
+
+<a name="installation"></a>
 
 ## 2. Install the project
 
@@ -62,7 +66,7 @@ You need Git, **Python 3.10 or newer**, and enough space for the original HDF5 f
 
 The required Python packages are `numpy`, `h5py`, `Pillow`, and `opencv-python`. There is currently no `requirements.txt`; install them using the command below.
 
-This project uses its own virtual environment, `.venv_converter`, to keep its dependencies separate. If you already have a `.venv` directory, leave it in place; you do not need to overwrite it. The commands below run Python directly from `.venv_converter`, so you do not need to activate it or change PowerShell's execution policy.
+This project uses its own virtual environment, `.venv_converter`, to keep its dependencies separate. If you already have a `.venv` directory, leave it in place; you do not need to overwrite it. The commands below run Python directly from `.venv_converter`, so **you do not need to activate it or change PowerShell's execution policy**.
 
 ### Windows: PowerShell or Command Prompt (CMD)
 
@@ -93,23 +97,7 @@ if not exist ".venv_converter" py -3 -m venv .venv_converter
 
 The PowerShell and CMD conditional commands are different; do not paste one into the other terminal. The direct Python commands for installation, checking imports, and conversion work in either terminal. Path arguments use **double quotes** because CMD treats single quotes as part of the path rather than as quotation marks.
 
-### Linux / macOS: shell
-
-These are equivalent setup commands; this project has been tested on Windows, and Linux/macOS have not been verified in this project.
-
-```bash
-git -c core.autocrlf=false clone https://github.com/FKEY1520/robotwin-to-triworldbench.git robotwin-to-triworldbench
-cd robotwin-to-triworldbench
-git config core.autocrlf false
-python3 --version
-if [ ! -e .venv_converter ]; then python3 -m venv .venv_converter; fi
-./.venv_converter/bin/python -m pip install --upgrade pip
-./.venv_converter/bin/python -m pip install numpy h5py Pillow opencv-python
-```
-
-Check that `python3 --version` reports Python 3.10 or newer. Some Linux installations require their distribution's Python `venv` package first.
-
-**Why disable automatic line-ending conversion?** The two official helper `.py` files are checked against SHA-256 hashes before use. Changing their original LF line endings to Windows CRLF changes their bytes and fails that check, even if the code looks identical. Keep the helper files unchanged; see [Section 12](#12-official-references-and-helper-files) if a checksum fails.
+<a name="source-data"></a>
 
 ## 3. Prepare the source dataset
 
@@ -124,7 +112,7 @@ your_workspace/
 │   ├── .venv_converter/                # Dedicated Python environment; created during installation
 │   ├── tests/
 │   └── _triworld_helpers/
-└── RoboTwin_Raw/                       # Source data, outside the repository
+└── RoboTwin_Raw/                       # --source-root points here
     └── adjust_bottle/                  # --task
         └── aloha-agilex_clean_50/      # --config
             ├── data/
@@ -140,37 +128,15 @@ your_workspace/
             └── config.yaml            # Optional; config.json/config.yml also copied
 ```
 
-`--source-root` must point to `RoboTwin_Raw`, not to `data/` or directly to an HDF5 file. The script constructs the complete path as:
-
-```text
-SOURCE_ROOT / TASK / CONFIG / data / episodeN.hdf5
-```
-
-Only filenames matching `episode` + digits + `.hdf5` are selected. Every selected HDF5 file needs an instruction JSON with the same episode number.
-
-A typical instruction file is:
-
-```json
-{
-  "seen": [
-    "Use the left arm to pick up the bottle.",
-    "Lift the bottle from the table."
-  ],
-  "unseen": [
-    "Raise the bottle with the left arm."
-  ]
-}
-```
-
-This illustrates the structure; use the original instructions corresponding to your actual recordings. A JSON string, a list of strings, or an object such as `{"instruction": "..."}` is also supported. Do not invent matching labels merely to make a missing-file check pass.
+This example illustrates the file structure only; use the original instructions corresponding to your actual trajectories. A JSON string, a list of strings, or an object such as `{"instruction": "..."}` is also supported. Do not invent matching labels merely to make a missing-file check pass.
 
 Optional metadata files must be at the configuration root shown above. The converter copies `scene_info.json`, `seed.txt`, `config.json`, `config.yaml`, and `config.yml` when present. It does not scan arbitrary directories for other metadata.
 
+<a name="first-conversion"></a>
+
 ## 4. Convert your first dataset
 
-Run all commands from the repository directory. Relative paths below are resolved from that current working directory. Replace the source root, task, and configuration if your dataset differs.
-
-**Always specify your source and output paths.** The script's built-in defaults still contain the original developer's `P:` drive paths. The commands here override them and are portable.
+Run all commands from the project root; relative paths are resolved from there. `../RoboTwin_Raw` refers to the source data in the parent directory, while `./outputs/...` refers to output inside the project. Replace these paths if your data is elsewhere. Task and configuration names must also match your actual directories.
 
 ### Step 1: Check all selected episodes without generating output
 
@@ -178,12 +144,6 @@ Windows PowerShell / CMD:
 
 ```powershell
 .\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 0 --dry-run
-```
-
-Linux / macOS:
-
-```bash
-./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 0 --dry-run
 ```
 
 The dry run checks file paths, matching instructions, required fields, array shapes, finite numeric values, vector order, and arm/instruction consistency for every selected episode. It reads the numeric arrays, so it may take time on a large dataset.
@@ -198,19 +158,13 @@ Windows PowerShell / CMD:
 .\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 1
 ```
 
-Linux / macOS:
-
-```bash
-./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 1
-```
-
 This small trial is often called a **smoke run**. It performs the actual image decoding and export, numeric copy verification, source preservation, and STATE generation. If the official helpers are missing, the script downloads the exact pinned versions and verifies their hashes.
 
 A completed run prints `SUCCESS:` followed by the output location. Open the three images in `outputs/adjust_bottle_smoke/test_dataset/first_frame/` and inspect `conversion_report.json` and `robotwin_episode_mapping.json` before continuing. For the first example run, `conversion_report.json` should contain `"episode_count": 1`, `"numeric_values_and_dtype_preserved": true`, and `"lossless_pngs": true`. Review any entries under `instruction_warnings`; a successful run can still report annotation warnings.
 
 ### Step 3: Convert the entire selected task/configuration
 
-Use a **new output directory** so that it does not conflict with the smoke run:
+Use a different output directory; you cannot keep writing into the existing smoke-run directory. The full conversion includes the previously tested episode again, rather than converting only the “remaining episodes.”
 
 Windows PowerShell / CMD:
 
@@ -218,15 +172,13 @@ Windows PowerShell / CMD:
 .\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_clean50" --limit 0
 ```
 
-Linux / macOS:
+`--limit 0` means all matching files actually present in the selected task and configuration. A folder named `clean_50` is not by itself proof that 50 files are available. For another task, change `--task`, `--config` as needed, and `--output-root`; run the same three-step workflow again.
 
-```bash
-./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_clean50" --limit 0
-```
+The script reads source files without modifying them and refuses to overwrite existing output directories. There is no append, resume, episode-offset, automatic skipping, or multi-task mode. **If any selected episode fails to convert, the entire batch stops.**
 
-`--limit 0` means all matching files currently present, including the episode already used for the smoke run. This creates a separate complete bundle. A folder named `clean_50` is not by itself proof that 50 files are available. For another task, change `--task`, `--config` as needed, and `--output-root`; run the same three-step workflow again.
+Files are built in a temporary sibling directory named like `.adjust_bottle_clean50.partial-...`, then renamed to the final output only after success. Ordinary conversion errors clean up that temporary directory; forced process termination or power loss may leave a partial directory.
 
-The script reads source files without modifying them and refuses to overwrite existing output directories. There is no append, resume, episode-offset, automatic skipping, or multi-task mode. A failed episode stops the whole batch. Files are built in a temporary sibling directory named like `.adjust_bottle_clean50.partial-...`, then renamed to the final output only after success. Ordinary conversion errors clean up that temporary directory; forced process termination or power loss may leave a partial directory.
+<a name="output-layout"></a>
 
 ## 5. Understand the output
 
@@ -272,7 +224,7 @@ Each `frames/` directory contains all `T` images, from `frame_00000` to the fram
 
 Source episodes are sorted **numerically** by their original numbers and assigned new numbers starting at `episode1`. For example, source `episode0`, `episode2`, and `episode10` become output `episode1`, `episode2`, and `episode3`. Use `robotwin_episode_mapping.json` to recover the original task, configuration, episode number, selected instruction, and source paths.
 
-The preserved source HDF5 retains everything it originally contained, including a front camera, camera calibration, and extra fields when present. These are not added to the three-view `test_dataset` HDF5. The converter verifies complete HDF5/instruction file copies using SHA-256 and records hashes for copied metadata. It does not copy `_traj_data`, source video directories, virtual environments, or arbitrary other source files. Thus, `source_data` preserves the selected recordings and supported metadata, not an entire raw directory backup.
+The preserved source HDF5 retains everything it originally contained, including a front camera, camera calibration, and extra fields when present. These are not added to `test_dataset/data/`, which contains only the nine numeric datasets. Copies of source HDF5 files, original instructions, and the specified metadata are verified using SHA-256, and their hashes are recorded. It does not copy `_traj_data`, source video directories, virtual environments, or arbitrary other source files. Thus, `source_data` preserves the selected recordings and supported metadata, not an entire raw directory backup.
 
 `conversion_report.json` records the episode count, preservation settings, JPEG quality, helper versions, instruction changes/warnings, and omitted source items. The mapping's path fields ending in `_rel` are relative to the **bundle root**, not the JSON file's own subdirectory.
 
@@ -288,9 +240,11 @@ three initial camera images + instruction + allowed action sequence
 
 Use the required files under `test_dataset/` to build your model adapter. The adapter must explicitly choose the numeric fields required by its protocol; the converter supplies both joint-action and end-effector arrays and does not choose a model's representation for it.
 
-The full future image sequences in `gt_dataset/` and `lossless/` are targets for training or references for evaluation. `STATE/` contains information derived from the complete trajectory. Do not feed future target images, full-trajectory annotations, or hidden source/scene information to a prediction model unless your evaluation protocol explicitly permits it. Extra files are preserved for traceability and evaluation, not automatic permission to use them as inputs.
+The full future image sequences in `gt_dataset/` and `lossless/` are targets for training or references for evaluation. `STATE/` contains information derived from the complete trajectory. Do not feed future target images, full-trajectory annotations, or hidden source/scene information to a prediction model unless your evaluation protocol explicitly permits it.
 
 Standard TriWorldBench readers continue to use `.jpg`. A custom pipeline that wants the lossless decoded pixels must explicitly read `lossless/`; its frame zero is the PNG equivalent of the initial observation. Do not simply rename PNG files to `.jpg`.
+
+<a name="data-semantics"></a>
 
 ## 6. Numerical values, actions, and image quality
 
@@ -337,9 +291,11 @@ Both output formats are generated **independently from the same decoded RGB arra
 
 PNG export and full source copies increase disk usage and conversion time. Add `--no-lossless-images` to a conversion command if you do not need the supplementary PNGs; this still keeps standard JPEGs and complete source HDF5 copies. Change JPEG quality with `--jpeg-quality`, from `1` to `100`, if your downstream workflow allows it.
 
+<a name="instructions"></a>
+
 ## 7. Instruction selection and its limits
 
-Only one instruction is written to `test_dataset/instructions/episodeN.json`, while the complete original instruction JSON is preserved in `source_data/`. The output instruction file has this structure:
+Only one instruction is written to `test_dataset/instructions/episodeN.json`, while the complete original instruction JSON is preserved in `source_data/`. The output instruction file has this structure; the actual sentence depends on the input:
 
 ```json
 {
@@ -357,39 +313,29 @@ The script estimates whether exactly one arm moves from changes in joint/gripper
 | `strict` | Stop and request manual review, even if another compatible candidate exists. |
 | `first` | Keep the first original candidate and record a warning. This deliberately retains the annotation conflict. |
 
-If the first instruction has no recognized conflict, it stays unchanged. The script never rewrites words or silently switches from `seen` to `unseen` to resolve a conflict. It records the original candidate, selected candidate, JSON location, reason, and warnings in the mapping and related metadata.
+If the first instruction has no recognized conflict, it stays unchanged. The script does not replace `right` with `left` in a sentence or silently switch from `seen` to `unseen` to resolve a conflict. It records the original candidate, selected candidate, JSON location, reason, and warnings in the mapping and related metadata.
 
-This is a narrow consistency check, **not general language understanding**. It recognizes explicit English expressions such as “left arm”, “right gripper”, or “both hands” using text patterns. It cannot verify every object name, color, spatial relation, paraphrase, or non-English instruction. When both arms move or neither clearly moves, it does not infer a single expected arm and keeps the first candidate with a warning. Human review is still needed for annotation quality.
+This is a narrow consistency check, **not general language understanding**. It recognizes explicit English expressions such as “left arm”, “right gripper”, or “both hands” using text patterns. It cannot verify every object name, color, spatial relation, paraphrase, or non-English instruction. When both arms move or neither clearly moves, it does not infer a single expected arm and keeps the first candidate with a warning.
 
 `STATE` annotations have a separate limitation: the official phase helper uses motion/gripper heuristics and task categories. Unknown task names fall back to its `pick_place` category. Successful export does not prove that those phases describe every new task correctly; inspect them before using them as labels.
+
+<a name="cli-options"></a>
 
 ## 8. All command-line options
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--source-root PATH` | Developer-specific source path below | Root containing task directories. |
+| `--source-root PATH` | Development environment path | Root containing task directories. |
 | `--task NAME` | `adjust_bottle` | One task directory name, not a path. |
 | `--config NAME` | `aloha-agilex_clean_50` | One configuration directory name, not a path. |
-| `--output-root PATH` | Developer-specific output path below | New bundle directory; it must not exist and must be separate from the selected source directory. |
-| `--limit N` | `1` | First `N` episodes in numeric order; `0` means all selected episodes. Negative values are rejected. |
+| `--output-root PATH` | Development environment path | New bundle directory; it must not exist and must be separate from the selected source directory. |
+| `--limit N` | `1` | First `N` episodes in numeric order of their original IDs; `0` means all, and negative values are rejected. This does not select the episode whose ID is `N`. |
 | `--dry-run` | Off | Run the preflight checks without image decoding or output generation. |
 | `--instruction-policy POLICY` | `consistent` | Choose `consistent`, `strict`, or `first`; see Section 7. |
 | `--no-lossless-images` | Off | Skip supplementary PNGs. PNGs are generated by default. |
 | `--jpeg-quality N` | `95` | JPEG quality from `1` through `100`; none is guaranteed lossless. |
 | `--repair-paths BUNDLE_ROOT` | Unset | Repair path metadata in an existing bundle instead of converting data. |
 | `-h`, `--help` | — | Print usage and exit. |
-
-The exact built-in path defaults are:
-
-```text
---source-root
-P:\RoboTwin数据集\RoboTwin_Raw
-
---output-root
-P:\RoboTwin数据集\RoboTwin_convert\adjust_bottle_convert\TriWorldBench_adjust_bottle_smoke_v2
-```
-
-These are local development defaults, not required folder names or shared download locations. Always override both paths on another computer. Paths containing spaces should be quoted. `--task` and `--config` must each be a single directory name.
 
 To display the script's built-in help:
 
@@ -400,6 +346,8 @@ To display the script's built-in help:
 ```bash
 ./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --help
 ```
+
+<a name="move-bundle"></a>
 
 ## 9. Move a converted dataset
 
@@ -413,17 +361,15 @@ Windows PowerShell / CMD:
 .\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --repair-paths "../moved_datasets/adjust_bottle_clean50"
 ```
 
-Linux / macOS:
-
-```bash
-./.venv_converter/bin/python -X utf8 ./convert_robotwin_to_triworld.py --repair-paths "../moved_datasets/adjust_bottle_clean50"
-```
-
 Replace the example path with the directory you actually moved the bundle to. Repair mode does not use `--source-root`, `--task`, `--config`, or `--output-root`. **Do not combine it with `--dry-run`; that combination is rejected.**
 
 The command validates required paths, backs up changed JSON files under `path_repair_backups/<timestamp>/`, and updates the mapping, per-episode GT metadata, and STATE paths. It does not re-encode images, change numeric arrays, reselect instructions, or regenerate phases. If all paths are already correct, it reports zero updates and creates no new backup. Historical `original_source_*` fields remain a record of where conversion originally read the data.
 
-Older bundles without preserved source copies can also have their paths repaired, but their original source HDF5 and instruction files must still exist at the recorded absolute paths. Repair does not upgrade old bundles with PNGs, source copies, new scene metadata, or corrected instruction choices. To obtain those additions, rerun conversion from the source into a new output directory.
+Relative paths in new bundles use `/` separators. After moving a bundle to another computer, run repair on the destination computer; actual migration to Linux/macOS has not been verified. For older bundles without complete source-file copies, repair still requires the HDF5 and instruction files to exist at their recorded original absolute paths. An old bundle containing only Windows absolute source paths cannot directly restore those paths on Linux.
+
+Path repair does not add PNGs, source-file copies, scene metadata, or new instruction selections to old bundles. To obtain these additions, convert the original data again into a new output directory.
+
+<a name="troubleshooting"></a>
 
 ## 10. Troubleshooting
 
@@ -458,7 +404,9 @@ From the repository directory, run the following commands in either PowerShell o
 .\.venv_converter\Scripts\python.exe -c "import sys, numpy, h5py, PIL, cv2; print(sys.version); print('Dependencies OK')"
 ```
 
-`Requirement already satisfied` only means pip found an installed package satisfying the requested version; it does not verify that its compiled extensions can load in the current Python. `--force-reinstall` replaces those packages, and the import command actually checks all four libraries (`Pillow` imports as `PIL`, and `opencv-python` as `cv2`). Continue converting only after `Dependencies OK` appears. If imports still fail, move the old environment aside and create a fresh environment as described in Section 2.
+`Requirement already satisfied` only means pip found an installed package satisfying the requested version; **it does not mean its binary extensions can load in the current Python**. `--force-reinstall` replaces those packages, and the import command actually checks all four libraries (`Pillow` imports as `PIL`, and `opencv-python` as `cv2`). Continue converting only after `Dependencies OK` appears. If imports still fail, move the old environment aside and create a fresh environment as described in Section 2.
+
+<a name="verification"></a>
 
 ## 11. Tests and verification scope
 
@@ -468,13 +416,7 @@ Run the included regression tests from the repository root. Windows is the verif
 .\.venv_converter\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
 ```
 
-The equivalent Linux/macOS command is shown for reference. The current suite includes Windows-specific path tests and has not been verified on those systems, so do not assume the same pass result there:
-
-```bash
-./.venv_converter/bin/python -X utf8 -m unittest discover -s tests -v
-```
-
-The current suite contains **34 tests**, covering instruction selection, path safety, and repair/backup/rollback behavior. The previously recorded local run passed all 34. These tests do not establish that every official dataset archive is compatible.
+The existing **34 tests** cover instruction selection, path safety, path repair, backups, and rollback after failure. All have passed locally on Windows. They use synthetic examples; they do not establish compatibility with every official archive and are not complete image-conversion tests on real recordings.
 
 The local verification recorded for the revised converter includes:
 
@@ -485,6 +427,8 @@ The local verification recorded for the revised converter includes:
 Separately, the **older converter's 50-episode output** was compared against the raw recordings: 450 numeric arrays matched exactly, and 21,714 images had correct frame/view correspondence. That older image check does not mean JPEG pixels were lossless. The earlier 50-episode audit and the revised converter's one-episode full run are different verification scopes.
 
 For your own data, confirm `SUCCESS`, review `conversion_report.json`, inspect instruction warnings and representative frames, and validate the resulting bundle in your own training/evaluation loader. Neither a folder name nor this verification history guarantees every task, robot, or later data release.
+
+<a name="references"></a>
 
 ## 12. Official references and helper files
 
@@ -500,6 +444,8 @@ The converter uses these exact pinned helper files rather than whatever is curre
 | `_triworld_helpers/decode_image_bit.py` | [RoboTwin image decoder at `bd563681`](https://raw.githubusercontent.com/RoboTwin-Platform/RoboTwin/bd5636810602b59c36c86dcf1bba42e5e15c1f3f/data/decode_image_bit.py) |
 | `_triworld_helpers/segment_episode_phases.py` | [TriWorldBench phase segmentation at `0d3603ec`](https://raw.githubusercontent.com/TriWorldBench/TriWorldBench/0d3603ec48df2448bd29d716c8de8cb6b45d3114/scripts/lib/segment_episode_phases.py) |
 
-Their SHA-256 values are recorded in `HELPERS` inside `convert_robotwin_to_triworld.py` and in each successful conversion report. Existing helper files are verified; missing helpers are downloaded and verified before use. An existing file with the wrong hash stops conversion and is not automatically replaced. Restore its exact pinned original, or move that specific invalid helper out of `_triworld_helpers/` and rerun so it can be downloaded again. Downloads require network access only when those files are absent. Retain the original file bytes, including line endings.
+SHA-256 values are stored in the `HELPERS` constant in `convert_robotwin_to_triworld.py` and recorded in each successful conversion report. Existing helpers are hash-checked before use; missing helpers are downloaded and checked. **If a file exists but its hash does not match, conversion stops; the file is not automatically replaced by a download.**
+
+Restore the exact original file from its table link, or move that one invalid helper out of `_triworld_helpers/` so the script downloads it again during the next conversion. Network access is needed only when a helper file is missing. Preserve the original bytes, including line endings.
 
 The repository's `.gitignore` excludes virtual environments, generated `outputs/`, dataset files, archives, and backups. Keep downloaded data outside the repository and review your Git changes before publishing.
