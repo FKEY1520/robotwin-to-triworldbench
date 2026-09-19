@@ -1,0 +1,76 @@
+# Python virtual environments and bytecode
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build and test artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environment settings
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Converter backups and temporary staging directories
+/backups/
+path_repair_backups/
+.*.partial-*/
+*.rebase-tmp
+*.bak
+*.tmp
+*.log
+
+# Generated datasets and verification outputs
+/source_data/
+/test_dataset/
+/gt_dataset/
+/STATE/
+/lossless/
+/RoboTwin_Raw/
+/RoboTwin_convert/
+/TriWorldBench_*/
+/artifacts/
+/outputs/
+conversion_report.json
+robotwin_episode_mapping.json
+
+# Dataset files and downloaded archives
+*.hdf5
+*.h5
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# Local editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+
+# Keep converter source, tests, README and pinned helper .py files in Git.
