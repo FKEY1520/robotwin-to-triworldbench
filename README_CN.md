@@ -2,9 +2,7 @@
 
 # RoboTwin → TriWorldBench 数据格式转换工具
 
-这个项目把**旧版 RoboTwin ALOHA 机器人数据**转换成**采用 TriWorldBench 目录布局的自定义数据集**。它保留机器人的原始数值轨迹，导出三个相机视角的图像，选择一条原始任务指令，并使用 TriWorldBench 官方辅助脚本生成动作阶段标注。
-
-这是社区转换工具。转换后的数据仍然是你自己的数据集，不会因此变成官方验证集或测试集。
+这个项目把**旧版 RoboTwin ALOHA 机器人数据**转换成**采用 TriWorldBench 目录布局的自定义数据集**。它保留机器人的原始数值轨迹，导出三个相机视角的图像，选择一条原始任务指令，并使用 TriWorldBench 官方辅助脚本生成动作阶段标注。这是转换工具。转换后的数据仍然是你自己的数据集，不会因此变成官方验证集或测试集。
 
 第一次使用，按这条顺序操作即可：**安装环境 → 整理一个任务的数据 → 预检查 → 试转一条 → 用新目录全量转换**。下面提供可直接修改使用的完整命令。
 
@@ -136,10 +134,26 @@ your_workspace/
 
 ## 4. 完成第一次转换
 
-以下命令都在项目根目录执行，相对路径也从这里计算。`../RoboTwin_Raw` 表示上一级目录中的原始数据，`./outputs/...` 表示项目中的输出目录。如果你的数据在别处，请替换路径；任务和配置名称也要与实际文件夹一致。
+
+### 4.1 进入项目，确认脚本和数据位置
+
+以下使用本机项目路径举例；项目放在其他位置时，替换第一行的目录。**已经安装好环境就直接使用 `.venv_converter`，这里不需要重新创建虚拟环境。**
+
+在 PowerShell 中依次执行，每条成功后再执行下一条：
+
+```powershell
+Set-Location "P:\RoboTwin数据集\convert_robotwin_to_triworld"
+Test-Path ".\convert_robotwin_to_triworld.py"
+Test-Path ".\.venv_converter\Scripts\python.exe"
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --help
+Test-Path "../RoboTwin_Raw/adjust_bottle/aloha-agilex_clean_50/data"
+Test-Path "../RoboTwin_Raw/adjust_bottle/aloha-agilex_clean_50/instructions"
+```
+
+四次 `Test-Path` 都应返回 `True`。`--help` 应列出 `--source-root`、`--task`、`--config`、`--output-root`、`--limit`、`--dry-run` 等参数；全部参数见第 8 节。`Test-Path` 只确认路径存在，数据内容是否符合要求要由后面的预检查判断。换任务时，这里的检查路径也要同步修改。
 
 
-### 第一步：预检查全部轨迹
+### 4.2 第一步：预检查全部轨迹
 
 Windows PowerShell / CMD：
 
@@ -147,11 +161,21 @@ Windows PowerShell / CMD：
 .\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 0 --dry-run
 ```
 
+这里 `--limit 0` 表示检查当前任务、当前配置中的全部匹配文件。若数据很多，也可以先改成 `--limit 1`，仅预检查按原始编号数值排序后的第一条；它不是指定名为 `episode1` 的文件。
+
 `--dry-run` 会检查路径、配套指令、所需字段、数组形状、数值是否有限、动作向量拼接顺序，以及能够识别的机械臂和指令冲突。它会读取数值数组，数据量大时也需要等待。
 
-预检查**不会解码图片，不会检查解码后的分辨率，不会加载或下载辅助脚本，也不会生成 STATE 或转换文件**。因此，预检查通过并不代表每张图片都能成功解码。即使是预检查，指定的输出目录也必须尚不存在。
+预检查**不会解码图片，不会检查解码后的分辨率，不会加载或下载辅助脚本，也不会生成 STATE 或转换文件**。因此，预检查通过并不代表每张图片都能成功解码。
 
-### 第二步：实际试转一条轨迹
+成功时，终端末尾会显示：
+
+```text
+Dry run passed. Image decoding and output creation have not run yet.
+```
+
+### 4.3 第二步：实际试转一条轨迹
+
+移除 `--dry-run`，并将 `--limit` 设为 `1`。预检查没有创建输出，因此下面可以继续使用同一个 smoke 输出路径；如果以前已经实际转换成功，则需要换一个新目录名。
 
 Windows PowerShell / CMD：
 
@@ -159,11 +183,11 @@ Windows PowerShell / CMD：
 .\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_smoke" --limit 1
 ```
 
-这类小规模试运行通常叫 **smoke run**。它会实际解码并导出图像、复制和校验数值、保留源文件、生成阶段标注。如果官方辅助脚本缺失，会先下载固定版本并校验。
+这类小规模试运行通常叫 **smoke run**。它会实际解码并导出图像、复制和校验数值、保留源文件、生成阶段标注。如果官方辅助脚本缺失，会先联网下载固定版本并校验；辅助文件已存在且校验通过时不需要下载。
 
 完成后终端会打印 `SUCCESS:` 和输出位置。继续全量转换前，可以打开 `outputs/adjust_bottle_smoke/test_dataset/first_frame/` 中的三张首帧图片，并查看 `conversion_report.json` 和 `robotwin_episode_mapping.json`。按上面命令试转一条后，报告应包含 `"episode_count": 1`、`"numeric_values_and_dtype_preserved": true`、`"lossless_pngs": true`。还要检查 `instruction_warnings`，成功转换也可能带有标注警告。
 
-### 第三步：用新目录转换全部轨迹
+### 4.4 第三步：用新目录转换全部轨迹
 
 这里使用另一个输出目录，不能继续写入已经存在的试转目录。全量转换会重新包含已经试转过的那条轨迹，不是只转换“剩余轨迹”。
 
@@ -173,11 +197,32 @@ Windows PowerShell / CMD：
 .\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task adjust_bottle --config aloha-agilex_clean_50 --output-root "./outputs/adjust_bottle_clean50" --limit 0
 ```
 
-`--limit 0` 表示当前所选任务和配置中实际存在的全部匹配文件。文件夹名称含 `clean_50` 不代表里面一定有 50 个文件。换一个任务时，修改 `--task`、必要时修改 `--config`，再指定新的 `--output-root`，重复上面的步骤。
+`--limit 0` 表示当前所选任务和配置中实际存在的全部匹配文件，**不是零条，也不是整个 `RoboTwin_Raw` 下的所有任务**。文件夹名称含 `clean_50` 不会强制产生或转换 50 条，实际条数取决于文件数量和 `--limit`。
+
+输出的轨迹从 `episode1` 连续重新编号，原编号与新编号的对应关系保存在 `robotwin_episode_mapping.json` 中。完整输出目录及文件用途见第 5 节。
 
 脚本只读原始数据，不覆盖已有输出。当前没有追加、断点续转、指定起始轨迹编号、自动跳过错误轨迹或自动遍历多个任务的模式。**任何一条选中轨迹转换失败，整批任务都会停止。**
 
 转换先写入输出旁的临时目录，例如 `.adjust_bottle_clean50.partial-...`，全部成功后才改名成正式输出目录。正常捕获的转换错误会清理临时目录；强制结束进程或断电可能留下未完成的目录。
+
+### 4.5 换任务、换配置或换磁盘时，具体改哪里
+
+| 你要做的事 | `--source-root` | `--task` | `--config` | `--output-root` 与运行模式 |
+| --- | --- | --- | --- | --- |
+| 同一个 Raw 目录中，从 `adjust_bottle` 换成 `beat_block_hammer` | 不变 | 改为 `beat_block_hammer` | 若配置目录同名则不变 | 使用新任务的输出目录，先预检查。 |
+| 同一任务改用另一个已解压的配置 | 不变 | 不变 | 改为真实存在的配置目录名，例如 `aloha-agilex_randomized_500` | 使用含新配置名称的新输出目录，重新检查兼容性。 |
+| 原始数据搬到其他磁盘或目录 | 改成新的 Raw 根目录 | 任务未变则不变 | 配置未变则不变 | 指定本次转换的新输出位置。 |
+| 从试转一条改为全量转换 | 不变 | 不变 | 不变 | 改为独立的全量输出目录，使用 `--limit 0`，移除 `--dry-run`。 |
+
+例如，**只有当你已经准备好** `RoboTwin_Raw/beat_block_hammer/aloha-agilex_clean_50/data/` 及配套的 `instructions/` 时，才能运行下面的首条预检查：
+
+```powershell
+.\.venv_converter\Scripts\python.exe -X utf8 .\convert_robotwin_to_triworld.py --source-root "../RoboTwin_Raw" --task beat_block_hammer --config aloha-agilex_clean_50 --output-root "./outputs/beat_block_hammer_aloha-agilex_clean_50_smoke" --limit 1 --dry-run
+```
+
+与 `adjust_bottle` 的单条预检查相比，这里只换了任务名和输出目录，Python、脚本、数据总目录与配置名都不变。通过后先移除 `--dry-run` 试转一条；成功后，再把 `--limit` 改为 `0`，同时换成新的全量输出目录。
+
+多个任务要分别执行命令、分别输出，不能重复使用同一个输出目录来自动合并。若新的数据换了机器人类型、HDF5 字段、图像尺寸或指令结构，可能需要适配转换代码，不能仅靠修改 `--task` 或 `--config` 保证兼容。
 
 <a name="output-layout"></a>
 
